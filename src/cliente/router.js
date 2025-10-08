@@ -1,17 +1,7 @@
 import express from 'express';
-import { Pool } from 'pg';
-
-const connection = new Pool({
-    host: 'localhost',
-    port: 5432,
-    user: 'postgres',
-    password: '123456',
-    database: 'aula-07-10-2025',
-});
+import connection from '../connection.js';
 
 const router = express.Router();
-
-const clientes = [];
 
 async function findById(id, res) {
     const sql = 'select * from cliente where id = $1';
@@ -53,12 +43,10 @@ router.post('/', async (req, res) => {
     const id = clientes.length + 1;
     try {
         const id = await getNextId();
-        const { nome, apelido } = req.body;
-        await connection.query(sql);
-        await connection.query('insert into cliente (id, nome, apelido) values ($1, $2, $3)', [id, nome, apelido]);
-        return res.status(201).json({
-            message: 'Cliente cadastrado com sucesso'
-        })
+        const { nome, apelido } = req.body;        
+        const { rows } = await connection.query('insert into cliente (id, nome, apelido) values ($1, $2, $3) RETURNING id', [id, nome, apelido]);
+        const [cliente] = rows;
+        return res.status(201).json(cliente)
     } catch (error) {
         return res.status(500).json({
             error: true,
@@ -76,13 +64,16 @@ router.put('/:id', async (req, res) => {
 })
 
 // DELETE http://localhost:3000/cliente/:id - Remove o cliente pelo seu identificador
-router.delete('/:id', (req, res) => {
-    const cliente = findById(req.params.id, res);
-    if (cliente) {
-        const index = clientes.indexOf(cliente);
-        clientes.splice(index, 1);
+router.delete('/:id', async (req, res) => {
+    try {
+        await connection.query('delete from cliente where id = $1', [req.params.id]);
         return res.json({
             message: 'Cliente removido com sucesso'
+        })
+    } catch (error) {
+        return res.status(500).json({
+            error: true,
+            message: error.message
         })
     }
 })
